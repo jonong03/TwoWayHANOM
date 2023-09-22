@@ -8,7 +8,7 @@
 #
 
 
-pacman::p_load(shiny, data.table, dplyr, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter, remotes)
+pacman::p_load(shiny, data.table, dplyr, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter, remotes, shinytitle)
 
 # Functions ---------------------------------------------------------------
 waiting_screen <- tagList(
@@ -151,7 +151,6 @@ testP1<- function(wlist, dist, alpha){
     rownames(out) <- c(1:k)
     return(out)
 }
-
 testP2<- function(wlist, dist, alpha){
     k<- length(dist)
     time<- 4
@@ -183,7 +182,6 @@ MetricsP1<- function(W, criticalvalue){
     
     return(rbind(W, center=center, LDL=LDL, UDL=UDL))
 }
-
 MetricsP2<- function(W, criticalvalue){
     xtildei <- W["xtildei",]
     k<- ncol(W)
@@ -254,26 +252,26 @@ interaction_test<-function(data){
 
 
 # UI ----------------------------------------------------------------------
-
-
 ui <- fluidPage(
     #autoWaiter(html= spin_pulsar(), color="black"),
     useWaiter(),
-    #waiterShowOnLoad(html=spin_square_circle(), color="black"),
-    waiterOnBusy(html= spin_dots()),
+    waiterPreloader(html=spin_square_circle(), color="black"),
+    #waiterOnBusy(html= spin_dots()),
     #useHostess(),
     theme = shinytheme("united"),
+    h1(id = "Two-Way HANOM",   # Application title
+       HTML('<span style="color:Tomato; font-family: Optima; font-size: 24;">Two-Way HANOM</span>')
+    ),  
+    #titlePanel("Two-way HANOM"),
 
-    # Application title
-    titlePanel("Two-way HANOM"),
-    helpText("Some text here"),
-    
     # Sidebar with a slider input for number of bins 
     sidebarPanel(
-        #helpText("A 3-column input: first column must be numerical"),
         fileInput("upload","Upload data", multiple = FALSE),
-        useWaitress(),
-        actionButton("run","Run Analysis"),
+        helpText("Continuous variable must be placed at the first column:"),
+        tableOutput("sampledata"),
+        br(),
+        #useWaitress(),
+        actionButton("run","Run Analysis", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         width=3
     ),
     mainPanel(
@@ -350,6 +348,8 @@ ui <- fluidPage(
 # Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
+    
+    output$sampledata<- renderTable( data.frame(`Dependent Variable`= c("Value1", "Value2", "Value3","..."), `Factor A`= c("A1", "A2", "A3", "..."), `Factor B`= c("B1","B2", "B3", "..."), check.names = FALSE) )
     
     #w<- Waiter$new(c("plot1.p1", "plot2.p1", "plot3.p1"))
     # Read Data
