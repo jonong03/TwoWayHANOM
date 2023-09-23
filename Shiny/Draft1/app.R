@@ -8,7 +8,9 @@
 #
 
 
-pacman::p_load(shiny, data.table, dplyr, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter, remotes, shinytitle)
+# listpackages<- c("shiny", "dplyr", "data.table", "shinythemes", "waiter", "ggplot2", "ggtext", "ggthemr", "waiter")
+# install.packages("pacman")
+pacman::p_load(shiny, dplyr, data.table, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter)
 
 # Functions ---------------------------------------------------------------
 waiting_screen <- tagList(
@@ -34,8 +36,8 @@ MeanP1<- function(data){
     
     # Calculate weighted sample mean: Xtilde
     maxvar <- max(vari)
-    Ui <- sapply(1:nk, function(a) (1/ni[a]) + (1/ni[a]) * sqrt((1/(ni[a]-1))*(maxvar/vari[a] - 1)) ) #Eq4
-    Vi <- sapply(1:nk, function(a) (1/ni[a]) - (1/ni[a]) * sqrt((ni[a]-1)*(maxvar/vari[a] - 1)) )  #Eq5
+    Ui <- sapply(1:nk, function(a) (1/ni[a]) + (1/ni[a]) * sqrt(max(0, (1/(ni[a]-1))*(maxvar/vari[a] - 1)) ) )#Eq4
+    Vi <- sapply(1:nk, function(a) (1/ni[a]) - (1/ni[a]) * sqrt(max(0, (ni[a]-1)*(maxvar/vari[a] - 1)) ) )  #Eq5
     xtildei <- sapply(1:nk, function(a) Ui[a] * sum(val[tr == k[a]][-ni[a]]) + Vi[a] * val[tr == k[a]][ni[a]])
     
     out<- rbind(ni, xbari, vari, Ui, Vi, xtildei)
@@ -69,27 +71,21 @@ MeanP2<- function(data){
     return(out)
 }
 
-
-# Simulate h* distribution (critical values)
-OneRunP1<- function(ni){
-    k<- length(ni)
-    ti<- sapply(1:k, function(p) rt(1, ni[p]-2))   #t(ni-2) distribution
-    ttildei<- sapply(1:k, function(p) ((k-1)/k)*ti[p]-(sqrt(ni[p])/k)*sum(ti[-p]/sqrt(ni[-p])))  #Eq9 (transform student-t dis into ttilde)
-    cv<- c(Min= min(ttildei), Max= max(ttildei))
-    return(cv)
+# Distribution functions
+hdist<- function(ni, iter){
+  k<- length(ni)
+  ti<- sapply(1:k, function(p) rt(iter, ni[p]-2))   #t(ni-2) distribution
+  ttildei<- sapply(1:iter, function(i) {
+    sapply(1:k, function(p) ((k-1)/k)*ti[i,p]-(sqrt(ni[p])/k)*sum(ti[i,-p]/sqrt(ni[-p])))  #Eq9 (transform student-t dis into ttilde)
+  })
+  cv<- data.frame(Min= apply(ttildei, 2, min), Max= apply(ttildei, 2, max))
+  return(cv)
 }
-OneRunP2<- function(W){
-    n0<- W['n0',] %>% unique()
-    k<- ncol(W)
-    t <- rt(n = k, df = n0-1)
-    max(t - mean(t))
-}
-
-# Calculate critical values at level alpha, based on cvdist (must be an object from SimCV() ).
-CalcCV<- function(cvdist, alpha){
-    CV.k<- quantile(cvdist[,2], 1-alpha/2)
-    CV.1<- -quantile(cvdist[,1], alpha/2)
-    max(CV.1, CV.k)  #Eq11
+ddist<- function(n0, iter){
+  k<- length(n0)
+  ti <- sapply(1:iter, function(i) rt(n = k, df = n0[1]-1))
+  out<- apply(ti, 2, function(t) max(t - mean(t)))
+  return(out)
 }
 
 # Compute P-Value 
@@ -104,7 +100,7 @@ pvalP1<- function(W, cvdist){
     tval<- (xtildei- mean(xtildei))/(sqrt(max(vari)/ni))
     
     pseq<- seq(0, 1, by= 0.001)
-    pquantile<- sapply(pseq, function(w) quantile(cvdist[,2], 1-w/2))
+    pquantile<- sapply(pseq, function(w) quantile(cvdist, 1-w/2))
     pequation<- abs(pquantile- max(abs(tval)))
     pval<- pseq[pequation== min(pequation)]
     
@@ -131,43 +127,6 @@ pvalP2<- function(W, cvdist){
     pval<- pseq[pequation== min(pequation)]
     
     return(pval)
-}
-
-# Compute CV and P-value
-testP1<- function(wlist, dist, alpha){
-    k<- length(dist)
-    time<- 4
-    out<- NULL
-    
-    for(q in 1:k){
-        h<- sapply(1:time, function(i) CalcCV(dist[[q]][,c(1:2)*i], alpha))
-        h<- data.frame(`CV Mean`= mean(h), `CV S.E.`= sd(h))
-        
-        p.val<- sapply(1:time, function(i) pvalP1(wlist[[q]], dist[[q]][,c(1:2)*i]) ) %>% mean
-        h<- cbind(h, pval= p.val) 
-        out<- rbind(out, h)
-        
-    }
-    rownames(out) <- c(1:k)
-    return(out)
-}
-testP2<- function(wlist, dist, alpha){
-    k<- length(dist)
-    time<- 4
-    out<- NULL
-    
-    for(q in 1:k){
-        # Calculate critical values
-        d<- sapply(1:time, function(i) quantile(dist[[q]][,i], 1-alpha/2))
-        h<- data.frame(`CV Mean`= mean(d), `CV S.E.`= sd(d) )
-        
-        # Calculate p-value
-        p.val<- sapply(1:time, function(i) pvalP2(wlist[[q]], dist[[q]][,i]) ) %>% mean
-        h<- cbind(h, pval= p.val) 
-        out<- rbind(out, h)
-    }
-    rownames(out) <- c(1:k)
-    return(out)
 }
 
 MetricsP1<- function(W, criticalvalue){
@@ -224,8 +183,8 @@ ggChart2 <- function(charttable, text1, text2, text3){
     g<- g + coord_cartesian(xlim=c(0.8,q+0.2)) + 
         scale_x_continuous(breaks= c(1:q), labels = M$xlabel) +
         labs(title=text1, subtitle= text2, x= text3, y= "Xtilde") +
-        theme(plot.margin= margin(20,50,25,25))
-    
+        theme(plot.margin= margin(20,50,25,25), 
+              axis.text.x = element_text(size=14)) 
     
     ggthemr('pale')
     return(g)
@@ -257,6 +216,7 @@ ui <- fluidPage(
     useWaiter(),
     waiterPreloader(html=spin_square_circle(), color="black"),
     #waiterOnBusy(html= spin_dots()),
+    withMathJax(),
     #useHostess(),
     theme = shinytheme("united"),
     h1(id = "Two-Way HANOM",   # Application title
@@ -275,7 +235,7 @@ ui <- fluidPage(
         width=3
     ),
     mainPanel(
-        numericInput("alpha","Type I error rate: ", value= 0.05, min=0, max=1, step= 0.01),
+        numericInput("alpha","Type I error rate (\\(\\alpha\\)):", value= 0.05, min=0, max=1, step= 0.01),
         tabsetPanel(
             id="tabs",
             tabPanel(title="P1 Procedure", 
@@ -350,8 +310,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
     
     output$sampledata<- renderTable( data.frame(`Dependent Variable`= c("Value1", "Value2", "Value3","..."), `Factor A`= c("A1", "A2", "A3", "..."), `Factor B`= c("B1","B2", "B3", "..."), check.names = FALSE) )
+    time<- 4
     
-    #w<- Waiter$new(c("plot1.p1", "plot2.p1", "plot3.p1"))
     # Read Data
     dt<- eventReactive(input$run,{
 
@@ -369,154 +329,116 @@ server <- function(input, output, session) {
         return(newdata)
     })
     
-
-    
     #observeEvent(input$run, {
     #    waiter_show(html = waiting_screen, color = "black")
     #    Sys.sleep(5)
     #    waiter_hide()
     #})
-# P1 Procedure ------------------------------------------------------------
 
-    # Calculate Statistics
-    p1.mean<- eventReactive(dt(), {
-        summary<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP1)
-        return(summary)
+    # First Dependency: if data is uploaded, run simulation 
+    sim<- eventReactive(dt(), {
+      
+      showModal(modalDialog("Running in progress", footer=NULL))
+      
+      # Calculate Statistics
+      p1.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP1)
+      p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
+  
+      # Simulate distribution
+      iter<- 100000
+      ni <- lapply(p1.mean, function(x) x['ni',])
+      n0 <- lapply(p2.mean, function(x) x['n0',])
+      distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
+      
+      removeModal()
+      showModal(modalDialog("Still running...", footer=NULL))
+      
+      distP2<- lapply(1:3, function(i) sapply(1:time, function(q) ddist(n0[[i]], iter)))
+      
+      removeModal()
+      return(list(p1.mean= p1.mean, p2.mean= p2.mean, distP1= distP1, distP2= distP2))
+  
     })
     
-    #Calculate h distribution
-    #p1.hdist<-eventReactive(dt(),{
-    #    iter<- 1000
-    #    times<- 4
-    #    totalloop<- iter*times*3
-    #        withProgressWaitress({
-    #            htemp<- array(0, dim=c(iter,2*times))
-    #            out.hdist<- list(htemp, htemp, htemp)
-    #            
-    #            for(h in 1:3){
-    #                for(j in 1:times){
-    #                    for(i in 1:iter){
-    #                        out.hdist[[h]][i,(2*j-1):(2*j)] <- OneRunP1(p1.mean()[[h]]['ni',]) #Min, Max
-    #                        incProgressWaitress(1/(iter*times*3))
-    #                    }
-    #                }
-    #            }
-    #        }, selector = "#run", theme = "overlay-percent", max= totalloop, infinite=FALSE)
-    #    return(out.hdist)
-    # })
-    #
-    p1.hdist<-eventReactive(dt(),{
-        iter<- 1000
-        times<- 4
-        totalloop<- iter*times*3
-            htemp<- array(0, dim=c(iter,2*times))
-            out.hdist<- list(htemp, htemp, htemp)
-            
-            for(h in 1:3){
-                for(j in 1:times){
-                    for(i in 1:iter){
-                        out.hdist[[h]][i,(2*j-1):(2*j)] <- OneRunP1(p1.mean()[[h]]['ni',]) #Min, Max
-                    }
-                }
-            }
-        return(out.hdist)
-    })
-        
-    #Calculate critical value and p-value
-    p1.test<- reactive(testP1(p1.mean(), p1.hdist(), input$alpha))
     
-    output$cv1.p1<- renderText(paste0("Critical value: ", p1.test()[1,1] %>% round(.,3)," (s.e.: ", p1.test()[1,2] %>% round(.,3), ")" ))
-    output$pval1.p1<- renderText(paste0("p-value: ", p1.test()[1,3] %>% round(.,3)))
-    output$cv2.p1<- renderText(paste0("Critical value: ", p1.test()[2,1] %>% round(.,3)," (s.e.: ", p1.test()[2,2] %>% round(.,3), ")" ))
-    output$pval2.p1<- renderText(paste0("p-value: ", p1.test()[2,3] %>% round(.,3)))
-    output$cv3.p1<- renderText(paste0("Critical value: ", p1.test()[3,1] %>% round(.,3)," (s.e.: ", p1.test()[3,2] %>% round(.,3), ")" ))
-    output$pval3.p1<- renderText(paste0("p-value: ", p1.test()[3,3] %>% round(.,3)))
-
-    output$intertest.p1<- renderTable(interaction_test(dt()[,c(1:3)])$result, rownames=TRUE, align= "c" )
-    
-    # Calculate Statistics
-    out.chartval<- eventReactive(p1.test(),{
-        v1<- MetricsP1(p1.mean()[[1]], p1.test()[1,1]) 
-        v2<- MetricsP1(p1.mean()[[2]], p1.test()[2,1] )
-        v3<- MetricsP1(p1.mean()[[3]], p1.test()[3,1])
-        return(list(v1=v1, v2=v2, v3=v3))
+    # Second Dependency: if simulation result is found, calculate critical value and p-value
+    test<- eventReactive(c(input$alpha,sim()), {
+      showModal(modalDialog("Updating details", footer=NULL))
+      
+      cv.p1<-sapply(1:3, function(i) sapply(1:time, function(q) quantile(sim()$distP1[[i]][2,q]$Max, 1-input$alpha/2)) )
+      pval.p1<- sapply(1:3, function(i) sapply(1:time, function(q) pvalP1(sim()$p1.mean[[i]], sim()$distP1[[i]][2,q]$Max)))
+      out.p1<- cbind(cvmean= apply(cv.p1,2, mean), cvse = apply(cv.p1,2, sd),pval = apply(pval.p1,2, mean))
+      
+      removeModal()
+      showModal(modalDialog("Almost there...", footer=NULL))
+      
+      cv.p2<-sapply(1:3, function(i) apply(sim()$distP2[[i]], 2, function(q) quantile(q, 1-input$alpha/2)) )
+      pval.p2<- sapply(1:3, function(i) sapply(1:time, function(q) pvalP2(sim()$p2.mean[[i]], sim()$distP2[[i]][,q])))
+      out.p2<- cbind(cvmean= apply(cv.p2,2, mean), cvse = apply(cv.p2,2, sd),pval = apply(pval.p2,2, mean))
+      
+      removeModal()
+      
+      return(list(outP1= out.p1, outP2= out.p2))
+      
     })
     
-    output$summary1.p1 <- renderTable(out.chartval()$v1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c", )
-    output$summary2.p1 <- renderTable(out.chartval()$v2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
-    output$summary3.p1 <- renderTable(out.chartval()$v3, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
-   
-    # Plots 
+    # Third Dependency: if cv and p-value is calculated, update statistics and charts
+    
+    out.chartval<- eventReactive(test(),{
+      showModal(modalDialog("Cool stuff coming up...", footer=NULL))
+      
+      v1.p1<- MetricsP1(sim()$p1.mean[[1]], test()$outP1[1,1]) 
+      v2.p1<- MetricsP1(sim()$p1.mean[[2]], test()$outP1[2,1] )
+      v3.p1<- MetricsP1(sim()$p1.mean[[3]], test()$outP1[3,1])
+      
+      v1.p2<- MetricsP2(sim()$p2.mean[[1]], test()$outP2[1,1]) 
+      v2.p2<- MetricsP2(sim()$p2.mean[[2]], test()$outP2[2,1] )
+      v3.p2<- MetricsP2(sim()$p2.mean[[3]], test()$outP2[3,1])
+      
+      removeModal()
+      
+      return(list(v1.p1=v1.p1, v2.p1=v2.p1, v3.p1=v3.p1, v1.p2=v1.p2, v2.p2= v2.p2, v3.p2=v3.p2))
+    })
+    
+    # Generate Plots 
     varname<- reactive(colnames(dt()))
+    output$plot1.p1<- renderPlot(ggChart2(out.chartval()$v1.p1, text1= paste0("Main Effect: ",varname()[2]), text2= " ", text3= "" ))
+    output$plot2.p1<- renderPlot(ggChart2(out.chartval()$v2.p1, text1= paste0("Main Effect: ",varname()[3]), text2= " ", text3= "" ))
+    output$plot3.p1<- renderPlot(ggChart2(out.chartval()$v3.p1, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ))
     
-    output$plot1.p1<- renderPlot({
-        input$run
-        Sys.sleep(10)
-        ggChart2(out.chartval()$v1, text1= paste0("Main Effect: ",varname()[2]), text2= "HANOM P1 Results: ", text3= varname()[2] )
-    })
-
-    output$plot2.p1<- renderPlot(ggChart2(out.chartval()$v2, text1= paste0("Main Effect: ",varname()[3]), text2= "HANOM P1 Results: ", text3= varname()[3] ))
-    output$plot3.p1<- renderPlot(ggChart2(out.chartval()$v3, text1= paste0("Main Effect: ",varname()[4]), text2= "HANOM P1 Results: ", text3= varname()[4] ))
+    output$plot1.p2<- renderPlot(ggChart2(out.chartval()$v1.p2, text1= paste0("Main Effect: ",varname()[2]), text2= " ", text3= "" ))
+    output$plot2.p2<- renderPlot(ggChart2(out.chartval()$v2.p2, text1= paste0("Main Effect: ",varname()[3]), text2= " ", text3= "" ))
+    output$plot3.p2<- renderPlot(ggChart2(out.chartval()$v3.p2, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ))
     
     
-
-# P2 Procedure ------------------------------------------------------------
+    # Print Summary Table
+    output$summary1.p1 <- renderTable(out.chartval()$v1.p1, rownames=TRUE, striped=TRUE, hover= FALSE, align= "c")
+    output$summary2.p1 <- renderTable(out.chartval()$v2.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$summary3.p1 <- renderTable(out.chartval()$v3.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
     
-    # Calculate Statistics
-    p2.mean<- eventReactive(dt(), {
-        summary<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
-        return(summary)
-    })
+    output$summary1.p2 <- renderTable(out.chartval()$v1.p2, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c", )
+    output$summary2.p2 <- renderTable(out.chartval()$v2.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
+    output$summary3.p2 <- renderTable(out.chartval()$v3.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
     
-    # Calculate d distribution
-    p2.ddist<-eventReactive(dt(),{
-        iter<- 100
-        times<- 4
-        totalloop<- iter*times*3
-        dtemp<- array(0, dim=c(iter,times))  
-        out.ddist<- list(dtemp, dtemp, dtemp)
-        
-        for(h in 1:3){
-            for(j in 1:times){
-                for(i in 1:iter){
-                    out.ddist[[h]][i,j] <- OneRunP2(p2.mean()[[h]]) #Min, Max
-                }
-            }
-        }
-        return(out.ddist)
-        message("yes")
-    })
     
-    # Calculate critical value and p-value
-    p2.test<- reactive(testP2(p2.mean(), p2.ddist(), input$alpha))
+    # Print Results Table
+    output$cv1.p1<- renderText(paste0("Critical value: ", test()$outP1[1,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[1,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval1.p1<- renderText(paste0("p-value: ", test()$outP1[1,3] %>% sprintf("%.3f",.)))
+    output$cv2.p1<- renderText(paste0("Critical value: ", test()$outP1[2,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[2,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval2.p1<- renderText(paste0("p-value: ", test()$outP1[2,3] %>% sprintf("%.3f",.)))
+    output$cv3.p1<- renderText(paste0("Critical value: ", test()$outP1[3,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[3,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval3.p1<- renderText(paste0("p-value: ", test()$outP1[3,3] %>% sprintf("%.3f",.)))
     
-    output$cv1.p2<- renderText(paste0("Critical value: ", p2.test()[1,1] %>% round(.,3)," (s.e.: ", p2.test()[1,2] %>% round(.,3), ")" ))
-    output$pval1.p2<- renderText(paste0("p-value: ", p2.test()[1,3] %>% round(.,3)))
-    output$cv2.p2<- renderText(paste0("Critical value: ", p2.test()[2,1] %>% round(.,3)," (s.e.: ", p2.test()[2,2] %>% round(.,3), ")" ))
-    output$pval2.p2<- renderText(paste0("p-value: ", p2.test()[2,3] %>% round(.,3)))
-    output$cv3.p2<- renderText(paste0("Critical value: ", p2.test()[3,1] %>% round(.,3)," (s.e.: ", p2.test()[3,2] %>% round(.,3), ")" ))
-    output$pval3.p2<- renderText(paste0("p-value: ", p2.test()[3,3] %>% round(.,3)))
+    output$cv1.p2<- renderText(paste0("Critical value: ", test()$outP2[1,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP2[1,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval1.p2<- renderText(paste0("p-value: ", test()$outP2[1,3] %>% sprintf("%.3f",.)))
+    output$cv2.p2<- renderText(paste0("Critical value: ", test()$outP2[2,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP2[2,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval2.p2<- renderText(paste0("p-value: ", test()$outP2[2,3] %>% sprintf("%.3f",.)))
+    output$cv3.p2<- renderText(paste0("Critical value: ", test()$outP2[3,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP2[3,2] %>% sprintf("%.3f",.), ")" ))
+    output$pval3.p2<- renderText(paste0("p-value: ", test()$outP2[3,3] %>% sprintf("%.3f",.)))
     
+    output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
     output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
     
-    # Calculate Statistics
-    out.chartval.p2<- eventReactive(p2.test(),{
-        v1<- MetricsP2(p2.mean()[[1]], p2.test()[1,1]) 
-        v2<- MetricsP2(p2.mean()[[2]], p2.test()[2,1] )
-        v3<- MetricsP2(p2.mean()[[3]], p2.test()[3,1])
-        return(list(v1=v1, v2=v2, v3=v3))
-    })
-    
-    output$summary1.p2 <- renderTable(out.chartval.p2()$v1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c", )
-    output$summary2.p2 <- renderTable(out.chartval.p2()$v2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
-    output$summary3.p2 <- renderTable(out.chartval.p2()$v3, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
-    
-    # Plots 
-    output$plot1.p2<- renderPlot(ggChart2(out.chartval.p2()$v1, text1= paste0("Main Effect: ",varname()[2]), text2= "HANOM P2 Results: ", text3= varname()[2] ))
-    output$plot2.p2<- renderPlot(ggChart2(out.chartval.p2()$v2, text1= paste0("Main Effect: ",varname()[3]), text2= "HANOM P2 Results: ", text3= varname()[3] ))
-    output$plot3.p2<- renderPlot(ggChart2(out.chartval.p2()$v3, text1= paste0("Main Effect: ",varname()[4]), text2= "HANOM P2 Results: ", text3= varname()[4] ))
-
-        
 }
 
 
