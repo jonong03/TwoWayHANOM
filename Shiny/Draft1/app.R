@@ -1,15 +1,8 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
 
+# Two Way HANOM -----------------------------------------------------------
 
-# listpackages<- c("shiny", "dplyr", "data.table", "shinythemes", "waiter", "ggplot2", "ggtext", "ggthemr", "waiter")
-# install.packages("pacman")
+install.packages("pacman") #Only first time needed
+devtools::install_github('Mikata-Project/ggthemr') #Only first time needed
 pacman::p_load(shiny, dplyr, data.table, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter)
 
 # Functions ---------------------------------------------------------------
