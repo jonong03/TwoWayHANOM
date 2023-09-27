@@ -1,9 +1,9 @@
 
 # Two Way HANOM -----------------------------------------------------------
 
-install.packages("pacman") #Only first time needed
-devtools::install_github('Mikata-Project/ggthemr') #Only first time needed
-pacman::p_load(shiny, dplyr, data.table, shinythemes, waiter, ggplot2, ggtext, ggthemr, waiter)
+#install.packages("pacman") #Only first time needed
+#devtools::install_github('Mikata-Project/ggthemr') #Only first time needed
+pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter)
 
 # Functions ---------------------------------------------------------------
 waiting_screen <- tagList(
@@ -233,7 +233,7 @@ ui <- fluidPage(
             id="tabs",
             tabPanel(title="P1 Procedure", 
                      fluidRow(
-                         column(8, plotOutput("plot1.p1", height="320px")),
+                         column(8, withSpinner(plotOutput("plot1.p1", height="320px"), type=6, color = "#E41A1C" ,size= 0.5, hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -243,7 +243,7 @@ ui <- fluidPage(
                          )),
                      fluidRow(
                          column(8, 
-                                plotOutput("plot2.p1", height="320px")),
+                                withSpinner(plotOutput("plot2.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -252,7 +252,7 @@ ui <- fluidPage(
                              tabPanel("Summary", tableOutput("summary2.p1")))
                          )),
                      fluidRow(
-                         column(8, plotOutput("plot3.p1", height="320px")),
+                         column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -264,7 +264,7 @@ ui <- fluidPage(
                      ),
             tabPanel(title="P2 Procedure", 
                      fluidRow(
-                         column(8, plotOutput("plot1.p2", height="320px")),
+                         column(8, withSpinner(plotOutput("plot1.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -273,7 +273,7 @@ ui <- fluidPage(
                              tabPanel("Summary", tableOutput("summary1.p2")))
                          )),
                      fluidRow(
-                         column(8, plotOutput("plot2.p2", height="320px")),
+                         column(8, withSpinner(plotOutput("plot2.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -282,7 +282,7 @@ ui <- fluidPage(
                              tabPanel("Summary", tableOutput("summary2.p2")))
                          )),
                      fluidRow(
-                         column(8, plotOutput("plot3.p2", height="320px")),
+                         column(8, withSpinner(plotOutput("plot3.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(), br(), br(),
@@ -338,7 +338,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 100000
+      iter<- 10000
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
@@ -356,20 +356,20 @@ server <- function(input, output, session) {
     
     # Second Dependency: if simulation result is found, calculate critical value and p-value
     test<- eventReactive(c(input$alpha,sim()), {
-      showModal(modalDialog("Updating details", footer=NULL))
+      #showModal(modalDialog("Updating details", footer=NULL))
       
       cv.p1<-sapply(1:3, function(i) sapply(1:time, function(q) quantile(sim()$distP1[[i]][2,q]$Max, 1-input$alpha/2)) )
       pval.p1<- sapply(1:3, function(i) sapply(1:time, function(q) pvalP1(sim()$p1.mean[[i]], sim()$distP1[[i]][2,q]$Max)))
       out.p1<- cbind(cvmean= apply(cv.p1,2, mean), cvse = apply(cv.p1,2, sd),pval = apply(pval.p1,2, mean))
       
-      removeModal()
-      showModal(modalDialog("Almost there...", footer=NULL))
+      #removeModal()
+      #showModal(modalDialog("Almost there...", footer=NULL))
       
       cv.p2<-sapply(1:3, function(i) apply(sim()$distP2[[i]], 2, function(q) quantile(q, 1-input$alpha/2)) )
       pval.p2<- sapply(1:3, function(i) sapply(1:time, function(q) pvalP2(sim()$p2.mean[[i]], sim()$distP2[[i]][,q])))
       out.p2<- cbind(cvmean= apply(cv.p2,2, mean), cvse = apply(cv.p2,2, sd),pval = apply(pval.p2,2, mean))
       
-      removeModal()
+      #removeModal()
       
       return(list(outP1= out.p1, outP2= out.p2))
       
