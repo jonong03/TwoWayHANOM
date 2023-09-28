@@ -6,11 +6,6 @@
 pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter)
 
 # Functions ---------------------------------------------------------------
-waiting_screen <- tagList(
-    spin_pong(),
-    h4("Cool stuff loading...")
-) 
-
 # Calculate Statistics
 MeanP1<- function(data){
     
@@ -98,13 +93,7 @@ pvalP1<- function(W, cvdist){
     pval<- pseq[pequation== min(pequation)]
     
     return(pval)
-    
-    #if(P.value1 > 0 && P.value1 < 1){
-    #  PV1<-sprintf("%.3f",P.value1)
-    #}else if(P.value1 == 0){
-    #  PV1<-"< 0.001 "
-    #}else{PV1 <-"> 0.999"}
-    
+
 }
 pvalP2<- function(W, cvdist){
     xbari<- W['xbari',]
@@ -322,12 +311,6 @@ server <- function(input, output, session) {
         return(newdata)
     })
     
-    #observeEvent(input$run, {
-    #    waiter_show(html = waiting_screen, color = "black")
-    #    Sys.sleep(5)
-    #    waiter_hide()
-    #})
-
     # First Dependency: if data is uploaded, run simulation 
     sim<- eventReactive(dt(), {
       
@@ -338,7 +321,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 10000
+      iter<- 50000
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
