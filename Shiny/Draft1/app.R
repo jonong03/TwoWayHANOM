@@ -225,7 +225,9 @@ ui <- fluidPage(
                          column(8, withSpinner(plotOutput("plot1.p1", height="320px"), type=6, color = "#E41A1C" ,size= 0.5, hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
-                                      br(), br(), br(),
+                                      br(),
+                                      span(textOutput("H0.1"), style="color:#318481"), #font-style:italic"
+                                      br(),
                                       textOutput("cv1.p1"),
                                       textOutput("pval1.p1")),
                              tabPanel("Summary", tableOutput("summary1.p1")))
@@ -235,7 +237,9 @@ ui <- fluidPage(
                                 withSpinner(plotOutput("plot2.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
-                                      br(), br(), br(),
+                                      br(),
+                                      span(textOutput("H0.2"), style="color:#318481"),
+                                      br(),
                                       textOutput("cv2.p1"),
                                       textOutput("pval2.p1")),
                              tabPanel("Summary", tableOutput("summary2.p1")))
@@ -244,7 +248,9 @@ ui <- fluidPage(
                          column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
-                                      br(), br(), br(),
+                                      br(),
+                                      span(textOutput("H0.3"), style="color:#318481"),
+                                      br(),
                                       textOutput("cv3.p1"),
                                       textOutput("pval3.p1")),
                              tabPanel("Summary", tableOutput("summary3.p1")),
@@ -321,7 +327,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 50000
+      iter<- 100000
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
@@ -398,6 +404,10 @@ server <- function(input, output, session) {
     
     
     # Print Results Table
+    output$H0.1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
+    output$H0.2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
+    output$H0.3<- renderText(paste0("Null Hypothesis: All treatment means of interaction effect (",varname()[4],") are equal"))
+    
     output$cv1.p1<- renderText(paste0("Critical value: ", test()$outP1[1,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[1,2] %>% sprintf("%.3f",.), ")" ))
     output$pval1.p1<- renderText(paste0("p-value: ", test()$outP1[1,3] %>% sprintf("%.3f",.)))
     output$cv2.p1<- renderText(paste0("Critical value: ", test()$outP1[2,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[2,2] %>% sprintf("%.3f",.), ")" ))
@@ -414,6 +424,9 @@ server <- function(input, output, session) {
     
     output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
     output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
+    
+    
+    
     
 }
 
