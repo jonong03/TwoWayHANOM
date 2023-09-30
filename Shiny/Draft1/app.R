@@ -3,7 +3,7 @@
 
 #install.packages("pacman") #Only first time needed
 #devtools::install_github('Mikata-Project/ggthemr') #Only first time needed
-pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter)
+pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter, kableExtra, xtable)
 
 # Functions ---------------------------------------------------------------
 # Calculate Statistics
@@ -196,8 +196,8 @@ ui <- fluidPage(
     useWaiter(),
     waiterPreloader(html=spin_square_circle(), color="black"),
     #waiterOnBusy(html= spin_dots()),
-    withMathJax(),
     #useHostess(),
+    withMathJax(),
     theme = shinytheme("united"),
     h1(id = "Two-Way HANOM",   # Application title
        HTML('<span style="color:Tomato; font-family: Optima; font-size: 24;">Two-Way HANOM</span>')
@@ -205,14 +205,14 @@ ui <- fluidPage(
 
     sidebarPanel(
         fileInput("upload","Upload data", multiple = FALSE),
-        helpText("1. The X-axis of output plots may become cluttered with numerous groups or lengthy label names. Keep treatment label names short."),
+        helpText("1. Keep treatment label names short. Output charts and tables may become cluttered with lengthy label names or numerous groups."),
         helpText("2. Continuous variable must be placed at the first column:"),
         tableOutput("sampledata"),
         br(),
         br(),
         actionButton("run","Run Analysis", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         width=3,
-        br(), br(), br(), br(), br(),
+        br(), br(), br(), br()
         ),
  
     mainPanel(
@@ -229,7 +229,10 @@ ui <- fluidPage(
                                       br(),
                                       textOutput("cv1.p1"),
                                       textOutput("pval1.p1")),
-                             tabPanel("Summary", tableOutput("summary1.p1")))
+                             tabPanel("Summary", 
+                                      tableOutput("summary1.p1")
+                                      #uiOutput("summary1.p1kable")
+                                      ))
                          )),
                      fluidRow(
                          column(8, 
@@ -326,7 +329,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 100
+      iter<- 10000
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
@@ -396,15 +399,30 @@ server <- function(input, output, session) {
     
     
     # Print Summary Table
-    output$summary1.p1 <- renderTable(out.chartval()$v1.p1, rownames=TRUE, striped=TRUE, hover= FALSE, align= "c")
+    output$summary1.p1 <- renderTable(out.chartval()$v1.p1, include.rownames = TRUE, striped=TRUE, align= "c")
     output$summary2.p1 <- renderTable(out.chartval()$v2.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
     output$summary3.p1 <- renderTable(out.chartval()$v3.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
     
     output$summary1.p2 <- renderTable(out.chartval()$v1.p2, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c", )
     output$summary2.p2 <- renderTable(out.chartval()$v2.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
     output$summary3.p2 <- renderTable(out.chartval()$v3.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
+
     
+    ##
+    #output$summary1.p1kable <- function(){
+    #  rn<-  c("$n_i$", "$\\bar X_{i}$", "$S_{i}$", "$U_{i}$", "$V_{i}$","$\\tilde X_{i}$", "Center","LDL", "UDL")
+    #  out<- out.chartval()$v1.p1
+    #  rownames(out)<- rn
+    #  kable(print.xtable(xtable(out), type = "html"), escape=F) 
+    #}
     
+    #output$summary1.p1kable <- function(){
+    #  rn<-  c("$n_i$", "$\\bar X_{i}$", "$S_{i}$", "$U_{i}$", "$V_{i}$","$\\tilde X_{i}$", "Center","LDL", "UDL")
+    #  out<- out.chartval()$v1.p1
+    #  rownames(out)<- rn
+    #  kable(xtable2kable(xtable(out)), escape = FALSE) 
+    #}
+      
     # Print Results Table
     output$H0.1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
     output$H0.2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
