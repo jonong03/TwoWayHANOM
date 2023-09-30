@@ -164,14 +164,12 @@ ggChart2 <- function(charttable, text1, text2, text3){
     # Set x-limits
     g<- g + coord_cartesian(xlim=c(0.8,q+0.2)) + 
         scale_x_continuous(breaks= c(1:q), labels = M$xlabel) +
-        labs(title=text1, subtitle= text2, x= text3, y= "Xtilde") +
+        labs(title=text1, subtitle= text2, x= text3, y= "Xtilde")+
         theme(plot.margin= margin(20,50,25,25), 
+              plot.caption = element_text(hjust=0),
               axis.text.x = element_text(size=14)) 
-    
     ggthemr('pale')
     return(g)
-    
-    
 }
 
 interaction_test<-function(data){
@@ -204,18 +202,19 @@ ui <- fluidPage(
     h1(id = "Two-Way HANOM",   # Application title
        HTML('<span style="color:Tomato; font-family: Optima; font-size: 24;">Two-Way HANOM</span>')
     ),  
-    #titlePanel("Two-way HANOM"),
 
-    # Sidebar with a slider input for number of bins 
     sidebarPanel(
         fileInput("upload","Upload data", multiple = FALSE),
-        helpText("Continuous variable must be placed at the first column:"),
+        helpText("1. The X-axis of output plots may become cluttered with numerous groups or lengthy label names. Keep treatment label names short."),
+        helpText("2. Continuous variable must be placed at the first column:"),
         tableOutput("sampledata"),
         br(),
-        #useWaitress(),
+        br(),
         actionButton("run","Run Analysis", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
-        width=3
-    ),
+        width=3,
+        br(), br(), br(), br(), br(),
+        ),
+ 
     mainPanel(
         numericInput("alpha","Type I error rate (\\(\\alpha\\)):", value= 0.05, min=0, max=1, step= 0.01),
         tabsetPanel(
@@ -312,7 +311,7 @@ server <- function(input, output, session) {
         data[,3]<- data[,3] %>% as.factor
         newdata<- data.frame(data, inter= paste(data[,2],data[,3], sep=":"))  #Define interaction column
         cn<- colnames(data)
-        colnames(newdata)[4]<- paste(cn[2], cn[3], sep=":")
+        colnames(newdata)[4]<- paste(cn[2], cn[3], sep="*")
         
         return(newdata)
     })
@@ -327,7 +326,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 100000
+      iter<- 100
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
@@ -384,13 +383,16 @@ server <- function(input, output, session) {
     
     # Generate Plots 
     varname<- reactive(colnames(dt()))
-    output$plot1.p1<- renderPlot(ggChart2(out.chartval()$v1.p1, text1= paste0("Main Effect: ",varname()[2]), text2= " ", text3= "" ))
-    output$plot2.p1<- renderPlot(ggChart2(out.chartval()$v2.p1, text1= paste0("Main Effect: ",varname()[3]), text2= " ", text3= "" ))
-    output$plot3.p1<- renderPlot(ggChart2(out.chartval()$v3.p1, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ))
+    output$plot1.p1<- renderPlot(ggChart2(out.chartval()$v1.p1, text1= paste0("Main Effect: ",varname()[2]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
+    output$plot2.p1<- renderPlot(ggChart2(out.chartval()$v2.p1, text1= paste0("Main Effect: ",varname()[3]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
+    output$plot3.p1<- renderPlot(ggChart2(out.chartval()$v3.p1, text1= paste0("Interaction Effect: ",varname()[4]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ) + 
+                                   labs(caption = "The colon operator ':' indicates interaction among two or more treatments")
+    )
     
-    output$plot1.p2<- renderPlot(ggChart2(out.chartval()$v1.p2, text1= paste0("Main Effect: ",varname()[2]), text2= " ", text3= "" ))
-    output$plot2.p2<- renderPlot(ggChart2(out.chartval()$v2.p2, text1= paste0("Main Effect: ",varname()[3]), text2= " ", text3= "" ))
-    output$plot3.p2<- renderPlot(ggChart2(out.chartval()$v3.p2, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ))
+    output$plot1.p2<- renderPlot(ggChart2(out.chartval()$v1.p2, text1= paste0("Main Effect: ",varname()[2]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
+    output$plot2.p2<- renderPlot(ggChart2(out.chartval()$v2.p2, text1= paste0("Main Effect: ",varname()[3]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
+    output$plot3.p2<- renderPlot(ggChart2(out.chartval()$v3.p2, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ) + 
+                                   labs(caption = "The colon operator ':' indicates interaction among two or more treatments"))
     
     
     # Print Summary Table
@@ -424,9 +426,6 @@ server <- function(input, output, session) {
     
     output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
     output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
-    
-    
-    
     
 }
 
