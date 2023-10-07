@@ -1,9 +1,8 @@
-
 # Two Way HANOM -----------------------------------------------------------
 
 #install.packages("pacman") #Only first time needed
 #devtools::install_github('Mikata-Project/ggthemr') #Only first time needed
-pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter, kableExtra, xtable)
+pacman::p_load(shiny, dplyr, data.table, shinythemes, shinycssloaders, waiter, ggplot2, ggtext, ggthemr, waiter)
 
 # Functions ---------------------------------------------------------------
 # Calculate Statistics
@@ -121,7 +120,10 @@ MetricsP1<- function(W, criticalvalue){
     LDL <- mean(xtildei) - criticalvalue * sqrt(z1) / sqrt(ni)
     UDL <- mean(xtildei) + criticalvalue * sqrt(z1)/ sqrt(ni)
     
-    return(rbind(W, center=center, LDL=LDL, UDL=UDL))
+    out<- rbind(W, center=center, LDL=LDL, UDL=UDL)
+    #rownames(out) <- c("\\( n_{i} )\\", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+    
+    return(out)
 }
 MetricsP2<- function(W, criticalvalue){
     xtildei <- W["xtildei",]
@@ -133,8 +135,10 @@ MetricsP2<- function(W, criticalvalue){
     LDL <- mean(xtildei) - criticalvalue * sqrt(z1)
     UDL <- mean(xtildei) + criticalvalue * sqrt(z1)
     
-    return(rbind(W, center=center, LDL=LDL, UDL=UDL))
+    out<- rbind(W, center=center, LDL=LDL, UDL=UDL)
+    #rownames(out) <- c("\\( n_{i} )\\", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
     
+    return(out)    
 }
 
 ggChart2 <- function(charttable, text1, text2, text3){
@@ -183,11 +187,7 @@ interaction_test<-function(data){
 }
 
 
-# Example usage:
-# ChartP1_ggplot(chartvalue, criticalvalue)
 
-# Example usage:
-# ChartP1_ggplot(chartvalue, criticalvalue)
 
 
 # UI ----------------------------------------------------------------------
@@ -230,8 +230,7 @@ ui <- fluidPage(
                                       textOutput("cv1.p1"),
                                       textOutput("pval1.p1")),
                              tabPanel("Summary", 
-                                      tableOutput("summary1.p1")
-                                      #uiOutput("summary1.p1kable")
+                                      uiOutput("summary1.p1")
                                       ))
                          )),
                      fluidRow(
@@ -244,7 +243,7 @@ ui <- fluidPage(
                                       br(),
                                       textOutput("cv2.p1"),
                                       textOutput("pval2.p1")),
-                             tabPanel("Summary", tableOutput("summary2.p1")))
+                             tabPanel("Summary", uiOutput("summary2.p1")))
                          )),
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
@@ -255,7 +254,7 @@ ui <- fluidPage(
                                       br(),
                                       textOutput("cv3.p1"),
                                       textOutput("pval3.p1")),
-                             tabPanel("Summary", tableOutput("summary3.p1")),
+                             tabPanel("Summary", uiOutput("summary3.p1")),
                              tabPanel("Interaction Test", tableOutput("intertest.p1")))
                          ))
                      ),
@@ -267,7 +266,7 @@ ui <- fluidPage(
                                       br(), br(), br(),
                                       textOutput("cv1.p2"),
                                       textOutput("pval1.p2")),
-                             tabPanel("Summary", tableOutput("summary1.p2")))
+                             tabPanel("Summary", uiOutput("summary1.p2")))
                          )),
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot2.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
@@ -276,7 +275,7 @@ ui <- fluidPage(
                                       br(), br(), br(),
                                       textOutput("cv2.p2"),
                                       textOutput("pval2.p2")),
-                             tabPanel("Summary", tableOutput("summary2.p2")))
+                             tabPanel("Summary", uiOutput("summary2.p2")))
                          )),
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
@@ -285,7 +284,7 @@ ui <- fluidPage(
                                       br(), br(), br(),
                                       textOutput("cv3.p2"),
                                       textOutput("pval3.p2")),
-                             tabPanel("Summary", tableOutput("summary3.p2")),
+                             tabPanel("Summary", uiOutput("summary3.p2")),
                              tabPanel("Interaction Test", tableOutput("intertest.p2")))
                          ))
             )
@@ -399,30 +398,84 @@ server <- function(input, output, session) {
     
     
     # Print Summary Table
-    output$summary1.p1 <- renderTable(out.chartval()$v1.p1, include.rownames = TRUE, striped=TRUE, align= "c")
-    output$summary2.p1 <- renderTable(out.chartval()$v2.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
-    output$summary3.p1 <- renderTable(out.chartval()$v3.p1, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$v1p1 <- renderTable({
+      out<- out.chartval()$v1.p1
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+      },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$v2p1 <- renderTable({
+      out<- out.chartval()$v2.p1
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+    },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$v3p1 <- renderTable({
+      out<- out.chartval()$v3.p1
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+    },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+   
+    output$v1p2 <- renderTable({
+      out<- out.chartval()$v1.p2
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+    },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$v2p2 <- renderTable({
+      out<- out.chartval()$v2.p2
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+    },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$v3p2 <- renderTable({
+      out<- out.chartval()$v3.p2
+      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      out
+    },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
     
-    output$summary1.p2 <- renderTable(out.chartval()$v1.p2, rownames=TRUE, striped=TRUE, hover= TRUE, align= "c", )
-    output$summary2.p2 <- renderTable(out.chartval()$v2.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
-    output$summary3.p2 <- renderTable(out.chartval()$v3.p2, rownames=TRUE, striped=TRUE, hover= TRUE, bordered= FALSE, align= "c")
+  
+    ## LaTeX Mode:
+    output$summary1.p1 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v1p1"))
+      )
+    })
+    output$summary2.p1 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v2p1"))
+      )
+    })
+    output$summary3.p1 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v3p1"))
+      )
+    })
+    output$summary1.p2 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v1p2"))
+      )
+    })
+    output$summary2.p2 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v2p2"))
+      )
+    })
+    output$summary3.p2 <- renderUI({
+      input$alpha # in order to re-render when input$alpha changes
+      tagList(
+        withMathJax(),
+        withMathJax(tableOutput("v3p3"))
+      )
+    })
 
-    
-    ##
-    #output$summary1.p1kable <- function(){
-    #  rn<-  c("$n_i$", "$\\bar X_{i}$", "$S_{i}$", "$U_{i}$", "$V_{i}$","$\\tilde X_{i}$", "Center","LDL", "UDL")
-    #  out<- out.chartval()$v1.p1
-    #  rownames(out)<- rn
-    #  kable(print.xtable(xtable(out), type = "html"), escape=F) 
-    #}
-    
-    #output$summary1.p1kable <- function(){
-    #  rn<-  c("$n_i$", "$\\bar X_{i}$", "$S_{i}$", "$U_{i}$", "$V_{i}$","$\\tilde X_{i}$", "Center","LDL", "UDL")
-    #  out<- out.chartval()$v1.p1
-    #  rownames(out)<- rn
-    #  kable(xtable2kable(xtable(out)), escape = FALSE) 
-    #}
-      
+
     # Print Results Table
     output$H0.1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
     output$H0.2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
@@ -452,3 +505,4 @@ server <- function(input, output, session) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
