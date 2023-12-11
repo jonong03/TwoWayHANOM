@@ -1,6 +1,6 @@
 # Two-Way Single-Stage Heteroscedastic Analysis of Means (HANOM) with Unbalanced Design
 
-Refer to *Shiny/Draft1.R* for a shiny program. Sample data can be sourced from *Data/Sample Data*
+Run shiny program from *Shiny/Draft1.R* and inputs can be sourced from *Data/Sample Data*
 
 
 Description
