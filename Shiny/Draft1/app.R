@@ -181,14 +181,12 @@ interaction_test<-function(data){
     out_aov<- aov(value~.^2, data)
     out2<- data.frame(summary(out_aov)[[1]])
     row_name<- rownames(out2)
+    row_name2<- gsub(" ","",row_name)
     p_val<- out2[grepl(":", row_name),5]
     inter<- sum(which(p_val<= 0.05)) >0  #Interaction effect is significant if result is TRUE
-    return(list(result= summary(out_aov)[[1]], sig= inter))
+    statement= paste("Interaction effect between", row_name2[1], "and", row_name2[2], "is", ifelse(inter, "significant", "not significant"))
+    return(list(result= summary(out_aov)[[1]], sig= inter, statement= statement ) )
 }
-
-
-
-
 
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
@@ -248,14 +246,15 @@ ui <- fluidPage(
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
+                           tabPanel("Interaction Test", tableOutput("intertest.p1")),
                              tabPanel("Result", 
                                       br(),
                                       span(textOutput("H0.3"), style="color:#318481"),
                                       br(),
                                       textOutput("cv3.p1"),
                                       textOutput("pval3.p1")),
-                             tabPanel("Summary", uiOutput("summary3.p1")),
-                             tabPanel("Interaction Test", tableOutput("intertest.p1")))
+                             tabPanel("Summary", uiOutput("summary3.p1"))
+                             )
                          ))
                      ),
             tabPanel(title="P2 Procedure", 
@@ -280,12 +279,13 @@ ui <- fluidPage(
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
+                           tabPanel("Interaction Test", tableOutput("intertest.p2")),
                              tabPanel("Result", 
                                       br(), br(), br(),
                                       textOutput("cv3.p2"),
                                       textOutput("pval3.p2")),
-                             tabPanel("Summary", uiOutput("summary3.p2")),
-                             tabPanel("Interaction Test", tableOutput("intertest.p2")))
+                             tabPanel("Summary", uiOutput("summary3.p2"))
+                            )
                          ))
             )
         )
@@ -317,6 +317,10 @@ server <- function(input, output, session) {
         
         return(newdata)
     })
+    
+    # Test Interaction
+    output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
+    output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
     
     # First Dependency: if data is uploaded, run simulation 
     sim<- eventReactive(dt(), {
@@ -357,7 +361,7 @@ server <- function(input, output, session) {
       
       cv.p2<-sapply(1:3, function(i) apply(sim()$distP2[[i]], 2, function(q) quantile(q, 1-input$alpha/2)) )
       pval.p2<- sapply(1:3, function(i) sapply(1:time, function(q) pvalP2(sim()$p2.mean[[i]], sim()$distP2[[i]][,q])))
-      out.p2<- cbind(cvmean= apply(cv.p2,2, mean), cvse = apply(cv.p2,2, sd),pval = apply(pval.p2,2, mean))
+      out.p2<- cbind(cvmean= apply(cv.p2,2, mean), cvse = apply(cv.p2,2, sd),pval = apply(pval.p2, 2, mean))
       
       #removeModal()
       
@@ -416,17 +420,17 @@ server <- function(input, output, session) {
    
     output$v1p2 <- renderTable({
       out<- out.chartval()$v1.p2
-      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      rownames(out) <- c("\\( n_{i} \\)", "\\( n_{0} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
       out
     },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
     output$v2p2 <- renderTable({
       out<- out.chartval()$v2.p2
-      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      rownames(out) <- c("\\( n_{i} \\)", "\\( n_{0} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
       out
     },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
     output$v3p2 <- renderTable({
       out<- out.chartval()$v3.p2
-      rownames(out) <- c("\\( n_{i} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
+      rownames(out) <- c("\\( n_{i} \\)", "\\( n_{0} \\)", "\\( \\bar{X_i} \\)", "\\( S_{i} \\)", "\\( U_{i} \\)", "\\( V_{i} \\)", "\\( \\tilde{X_i} \\)", "Center", "LDL", "UDL")
       out
     },include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
     
@@ -471,7 +475,7 @@ server <- function(input, output, session) {
       input$alpha # in order to re-render when input$alpha changes
       tagList(
         withMathJax(),
-        withMathJax(tableOutput("v3p3"))
+        withMathJax(tableOutput("v3p2"))
       )
     })
 
@@ -495,11 +499,9 @@ server <- function(input, output, session) {
     output$cv3.p2<- renderText(paste0("Critical value: ", test()$outP2[3,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP2[3,2] %>% sprintf("%.3f",.), ")" ))
     output$pval3.p2<- renderText(paste0("p-value: ", test()$outP2[3,3] %>% sprintf("%.3f",.)))
     
-    output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
-    output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
+
     
 }
-
 
 
 
