@@ -185,10 +185,11 @@ interaction_test<-function(data, alpha){
     p_val<- out2[grepl(":", row_name),5]
     
     inter<- sum(which(p_val<= alpha)) >0  #Interaction effect is significant if result is TRUE
-    null= paste("Null Hypothesis: There is no interaction between factors ", row_name2[1], "and", row_name2[2])
-    decision= paste("p-val", ifelse(inter, "<= alpha.", "> alpha."), "Interaction effect is", ifelse(inter, "significant", "not significant"))
+    null<- paste("Null Hypothesis: There is no interaction between factors ", row_name2[1], "and", row_name2[2])
+    sig<- ifelse(inter, "significant", "not significant")
+    decision= paste("Interaction effect is", ifelse(inter, "significant", "not significant"))
 
-    return(list(result= summary(out_aov)[[1]], pval=p_val, sig= inter, null= null, decision= decision) )
+    return(list(result= summary(out_aov)[[1]], pval=p_val, sig= sig, null= null, decision= decision) )
 }
 
 # UI ----------------------------------------------------------------------
@@ -237,8 +238,7 @@ ui <- fluidPage(
                          column(8, withSpinner(plotOutput("plot1.p1", height="320px"), type=6, color = "#E41A1C" ,size= 0.5, hide.ui = FALSE)),
                          column(4, tabsetPanel(
                              tabPanel("Result", 
-                                      br(),
-                                      span(textOutput("inter_sig"), style="color:#318481"),
+                                      span(textOutput("inter_sig"), style ="color:#ffffff"),
                                       span(textOutput("H0.1.p1"), style="color:#318481"), #font-style:italic"
                                       br(),
                                       textOutput("cv1.p1"),
@@ -260,7 +260,7 @@ ui <- fluidPage(
                              tabPanel("Summary", uiOutput("summary2.p1")))
                          )),
                      conditionalPanel(
-                       condition = "output.inter_sig == 'TRUE'",
+                       condition = "output.inter_sig == 'significant'",
                        fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
@@ -299,7 +299,7 @@ ui <- fluidPage(
                              tabPanel("Summary", uiOutput("summary2.p2")))
                          )),
                      conditionalPanel(
-                       condition = "output.inter_sig == 'TRUE'",
+                       condition = "output.inter_sig == 'significant'",
                        fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
@@ -353,9 +353,11 @@ server <- function(input, output, session) {
 
     output$inter_test <- renderTable(interaction_result()$result, include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
     output$inter_null <- renderText(interaction_result()$null)
-    output$inter_sig<- renderText(interaction_result()$pval <= input$alpha)
+    output$inter_sig<- renderText(interaction_result()$sig)
     output$inter_pval <- renderText(paste0("p-value: ", interaction_result()$pval %>% sprintf("%.3f",.)))
-    output$inter_decision <- renderText(paste0("Decision: ", interaction_result()$decision))
+    output$inter_pval2 <- renderText(interaction_result()$pval)
+    
+    output$inter_decision <- renderText(paste0("Result: ", interaction_result()$decision))
 
     # First Dependency: if data is uploaded, run simulation 
     sim<- eventReactive(dt(), {
@@ -367,7 +369,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 10000
+      iter<- 100
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
