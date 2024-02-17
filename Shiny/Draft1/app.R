@@ -176,16 +176,19 @@ ggChart2 <- function(charttable, text1, text2, text3){
     return(g)
 }
 
-interaction_test<-function(data){
+interaction_test<-function(data, alpha){
     colnames(data)[1]<- "value"
     out_aov<- aov(value~.^2, data)
     out2<- data.frame(summary(out_aov)[[1]])
     row_name<- rownames(out2)
     row_name2<- gsub(" ","",row_name)
     p_val<- out2[grepl(":", row_name),5]
-    inter<- sum(which(p_val<= 0.05)) >0  #Interaction effect is significant if result is TRUE
-    statement= paste("Interaction effect between", row_name2[1], "and", row_name2[2], "is", ifelse(inter, "significant", "not significant"))
-    return(list(result= summary(out_aov)[[1]], sig= inter, statement= statement ) )
+    
+    inter<- sum(which(p_val<= alpha)) >0  #Interaction effect is significant if result is TRUE
+    null= paste("Null Hypothesis: There is no interaction between factors ", row_name2[1], "and", row_name2[2])
+    decision= paste("p-val", ifelse(inter, "<= alpha.", "> alpha."), "Interaction effect is", ifelse(inter, "significant", "not significant"))
+
+    return(list(result= summary(out_aov)[[1]], pval=p_val, sig= inter, null= null, decision= decision) )
 }
 
 # UI ----------------------------------------------------------------------
@@ -216,6 +219,18 @@ ui <- fluidPage(
     mainPanel(
         numericInput("alpha","Type I error rate (\\(\\alpha\\)):", value= 0.05, min=0, max=1, step= 0.01),
         tabsetPanel(
+          tabPanel("F-test for Interaction Effect", 
+                   fluidRow(
+                     style = "height:190px",
+                     column(8, tableOutput("inter_test")),
+                     column(4, 
+                            br(), 
+                            span(textOutput("inter_null"), style="color:#318481"),
+                            br(), 
+                            textOutput("inter_pval"),
+                            textOutput("inter_decision"))
+        ))),
+        tabsetPanel(
             id="tabs",
             tabPanel(title="P1 Procedure", 
                      fluidRow(
@@ -223,7 +238,8 @@ ui <- fluidPage(
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(),
-                                      span(textOutput("H0.1"), style="color:#318481"), #font-style:italic"
+                                      span(textOutput("inter_sig"), style="color:#318481"),
+                                      span(textOutput("H0.1.p1"), style="color:#318481"), #font-style:italic"
                                       br(),
                                       textOutput("cv1.p1"),
                                       textOutput("pval1.p1")),
@@ -237,32 +253,36 @@ ui <- fluidPage(
                          column(4, tabsetPanel(
                              tabPanel("Result", 
                                       br(),
-                                      span(textOutput("H0.2"), style="color:#318481"),
+                                      span(textOutput("H0.2.p1"), style="color:#318481"),
                                       br(),
                                       textOutput("cv2.p1"),
                                       textOutput("pval2.p1")),
                              tabPanel("Summary", uiOutput("summary2.p1")))
                          )),
-                     fluidRow(
+                     conditionalPanel(
+                       condition = "output.inter_sig == 'TRUE'",
+                       fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p1", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
-                           tabPanel("Interaction Test", tableOutput("intertest.p1")),
+                           #tabPanel("Interaction Test", tableOutput("intertest.p1")),
                              tabPanel("Result", 
                                       br(),
-                                      span(textOutput("H0.3"), style="color:#318481"),
+                                      span(textOutput("H0.3.p1"), style="color:#318481"),
                                       br(),
                                       textOutput("cv3.p1"),
                                       textOutput("pval3.p1")),
                              tabPanel("Summary", uiOutput("summary3.p1"))
                              )
                          ))
-                     ),
+                     )),
             tabPanel(title="P2 Procedure", 
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot1.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
-                             tabPanel("Result", 
-                                      br(), br(), br(),
+                             tabPanel("Result",  
+                                      br(),
+                                      span(textOutput("H0.1.p2"), style="color:#318481"), #font-style:italic"
+                                      br(),
                                       textOutput("cv1.p2"),
                                       textOutput("pval1.p2")),
                              tabPanel("Summary", uiOutput("summary1.p2")))
@@ -270,18 +290,24 @@ ui <- fluidPage(
                      fluidRow(
                          column(8, withSpinner(plotOutput("plot2.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
-                             tabPanel("Result", 
-                                      br(), br(), br(),
+                             tabPanel("Result",  
+                                      br(),
+                                      span(textOutput("H0.2.p2"), style="color:#318481"), #font-style:italic"
+                                      br(),
                                       textOutput("cv2.p2"),
                                       textOutput("pval2.p2")),
                              tabPanel("Summary", uiOutput("summary2.p2")))
                          )),
-                     fluidRow(
+                     conditionalPanel(
+                       condition = "output.inter_sig == 'TRUE'",
+                       fluidRow(
                          column(8, withSpinner(plotOutput("plot3.p2", height="320px"), type = 6, size= 0.5, color = "#E41A1C", hide.ui = FALSE)),
                          column(4, tabsetPanel(
-                           tabPanel("Interaction Test", tableOutput("intertest.p2")),
+                           #tabPanel("Interaction Test", tableOutput("intertest.p2")),
                              tabPanel("Result", 
-                                      br(), br(), br(),
+                                      br(),
+                                      span(textOutput("H0.3.p2"), style="color:#318481"), #font-style:italic"
+                                      br(),
                                       textOutput("cv3.p2"),
                                       textOutput("pval3.p2")),
                              tabPanel("Summary", uiOutput("summary3.p2"))
@@ -290,7 +316,9 @@ ui <- fluidPage(
             )
         )
     )
+    )
 )
+
 
 
 
@@ -319,9 +347,16 @@ server <- function(input, output, session) {
     })
     
     # Test Interaction
-    output$intertest.p1<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
-    output$intertest.p2<- renderTable(interaction_test(dt()[,1:3])$result, rownames=TRUE, align= "c" )
-    
+    interaction_result<- eventReactive(c(dt(), input$alpha), {
+      interaction_test(dt()[,1:3], input$alpha)
+    })
+
+    output$inter_test <- renderTable(interaction_result()$result, include.rownames = TRUE, include.colnames = TRUE, striped=TRUE, hover= TRUE, align= "c")
+    output$inter_null <- renderText(interaction_result()$null)
+    output$inter_sig<- renderText(interaction_result()$pval <= input$alpha)
+    output$inter_pval <- renderText(paste0("p-value: ", interaction_result()$pval %>% sprintf("%.3f",.)))
+    output$inter_decision <- renderText(paste0("Decision: ", interaction_result()$decision))
+
     # First Dependency: if data is uploaded, run simulation 
     sim<- eventReactive(dt(), {
       
@@ -346,7 +381,6 @@ server <- function(input, output, session) {
       return(list(p1.mean= p1.mean, p2.mean= p2.mean, distP1= distP1, distP2= distP2))
   
     })
-    
     
     # Second Dependency: if simulation result is found, calculate critical value and p-value
     test<- eventReactive(c(input$alpha,sim()), {
@@ -392,13 +426,12 @@ server <- function(input, output, session) {
     output$plot1.p1<- renderPlot(ggChart2(out.chartval()$v1.p1, text1= paste0("Main Effect: ",varname()[2]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
     output$plot2.p1<- renderPlot(ggChart2(out.chartval()$v2.p1, text1= paste0("Main Effect: ",varname()[3]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
     output$plot3.p1<- renderPlot(ggChart2(out.chartval()$v3.p1, text1= paste0("Interaction Effect: ",varname()[4]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ) + 
-                                   labs(caption = "The colon operator ':' indicates interaction among two or more treatments")
-    )
-    
+                                   labs(caption = "The colon operator ':' indicates interaction among two or more treatments"))
+
     output$plot1.p2<- renderPlot(ggChart2(out.chartval()$v1.p2, text1= paste0("Main Effect: ",varname()[2]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
     output$plot2.p2<- renderPlot(ggChart2(out.chartval()$v2.p2, text1= paste0("Main Effect: ",varname()[3]), text2= "Treatment mean outside of decision limits suggests statistical difference from the overall average.", text3= "" ))
-    output$plot3.p2<- renderPlot(ggChart2(out.chartval()$v3.p2, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ) + 
-                                   labs(caption = "The colon operator ':' indicates interaction among two or more treatments"))
+    output$plot3.p2<- renderPlot( ggChart2(out.chartval()$v3.p2, text1= paste0("Interaction Effect: ",varname()[4]), text2= " ", text3= "" ) + 
+                                    labs(caption = "The colon operator ':' indicates interaction among two or more treatments") )
     
     
     # Print Summary Table
@@ -481,9 +514,14 @@ server <- function(input, output, session) {
 
 
     # Print Results Table
-    output$H0.1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
-    output$H0.2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
-    output$H0.3<- renderText(paste0("Null Hypothesis: All treatment means of interaction effect (",varname()[4],") are equal"))
+    output$H0.1.p1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
+    output$H0.2.p1<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
+    output$H0.3.p1<- renderText(paste0("Null Hypothesis: All treatment means of interaction effect (",varname()[4],") are equal"))
+    output$H0.1.p2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[2],") are equal"))
+    output$H0.2.p2<- renderText(paste0("Null Hypothesis: All treatment means of main effect (",varname()[3],") are equal"))
+    output$H0.3.p2<- renderText(paste0("Null Hypothesis: All treatment means of interaction effect (",varname()[4],") are equal"))
+    
+    
     
     output$cv1.p1<- renderText(paste0("Critical value: ", test()$outP1[1,1] %>% sprintf("%.3f",.)," (s.e.: ", test()$outP1[1,2] %>% sprintf("%.3f",.), ")" ))
     output$pval1.p1<- renderText(paste0("p-value: ", test()$outP1[1,3] %>% sprintf("%.3f",.)))
