@@ -208,7 +208,7 @@ ui <- fluidPage(
     sidebarPanel(
         fileInput("upload","Upload data", multiple = FALSE),
         helpText("1. Keep treatment label names short. Output charts and tables may become cluttered with lengthy label names or numerous groups."),
-        helpText("2. Continuous variable must be placed at the first column:"),
+        helpText("2. Response variable must be placed at the first column:"),
         tableOutput("sampledata"),
         br(),
         br(),
@@ -326,7 +326,7 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
     
-    output$sampledata<- renderTable( data.frame(`Dependent Variable`= c("Value1", "Value2", "Value3","..."), `Factor A`= c("A1", "A2", "A3", "..."), `Factor B`= c("B1","B2", "B3", "..."), check.names = FALSE) )
+    output$sampledata<- renderTable( data.frame(`Response Variable`= c("Value1", "Value2", "Value3","..."), `Factor A`= c("A1", "A2", "A3", "..."), `Factor B`= c("B1","B2", "B3", "..."), check.names = FALSE) )
     time<- 4
     
     # Read Data
@@ -369,7 +369,7 @@ server <- function(input, output, session) {
       p2.mean<- lapply(list(dt()[,c(1,2)], dt()[,c(1,3)], dt()[,c(1,4)]), MeanP2)
   
       # Simulate distribution
-      iter<- 100
+      iter<- 100000
       ni <- lapply(p1.mean, function(x) x['ni',])
       n0 <- lapply(p2.mean, function(x) x['n0',])
       distP1<- lapply(1:3, function(i) sapply(1:time, function(q) hdist(ni[[i]], iter)))
